@@ -135,7 +135,7 @@ class Voice_Cogs(commands.Cog):
                 try:
                     source = discord.FFmpegPCMAudio(
                         song['url'], 
-                        executable= "E:\\Winders\\iBackup\\Chai\\FFmpeg\\bin\\ffmpeg.exe",
+                        executable= "/usr/bin/ffmpeg",
                         before_options = "-loglevel debug"
                     )
                     self.tasker = asyncio.create_task(self.coro(ctx, int(song['duration'])))

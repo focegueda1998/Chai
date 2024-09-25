@@ -28,9 +28,10 @@ class Base_Cogs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        client = pm.MongoClient('mongodb://localhost:27017/')
-        curDB = client['chai_db']
-        print(f'Connected to database {curDB}')
+        # client = pm.MongoClient('mongodb://localhost:27017/')
+        # curDB = client['chai_db']
+        # print(f'Connected to database {curDB}')
+        print('Chai has connected to discord!')
 
     @commands.command(name='bark', help='she will bark for you.')
     async def bark(self, ctx, *content):
