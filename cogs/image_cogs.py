@@ -6,6 +6,8 @@ import requests
 import discord
 from discord.ext import commands
 
+# ! THESE FUNCTIONS ARE STILL UNDER DEVELOPMENT
+
 class Image_Cogs(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -31,11 +33,13 @@ class Image_Cogs(commands.Cog):
         if len(img_links) == 0:
             await ctx.send("No images found.")
             return
-        #! Note: The first image is a google logo, so we skip it.
+        #* Note: The first image is a google logo, so we skip it.
         #! Need to find a better way to get the first image.
         await ctx.send(img_links[1])
                 
 
+    #! This command has issues links from sites like tenor or giphy
+    #! Need to fix.
     @commands.command(name="getimg", help="gets an image from discord.")
     async def getimg(self, ctx, message_link: str = None):
         if not message_link:

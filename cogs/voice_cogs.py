@@ -25,6 +25,9 @@ class Voice_Cogs(commands.Cog):
     @commands.command(name='play', help='she will sing a song for you.')
     @in_voice()
     async def play(self, ctx, *content):
+        if not content or len(content) == 0 or (len(content) == 1 and content[0] == ""):
+            await ctx.send("a search query or direct youtube link is required.")
+            return
         query = '+'.join(content)
         channel = ctx.message.author.voice.channel
         voice = discord.utils.get(ctx.guild.voice_channels, name=channel.name)
@@ -34,6 +37,7 @@ class Voice_Cogs(commands.Cog):
         else:
             await voice_client.move_to(channel)
         await self.playhandler(ctx, query, voice_client)
+
 
     async def playhandler(self, ctx, query, voice_client):
         guild_id = ctx.guild.id
@@ -48,11 +52,12 @@ class Voice_Cogs(commands.Cog):
             vid = next(res, None)
         info = None
         if not vid:
-            info = await self.search(ctx, query)
-            if not info:
+            vid = await self.search(ctx, query)
+            if not vid:
                 return
         else:
-            info = self.ydl.extract_info("https://www.youtube.com/watch?v=" + vid.group(1), download=False)
+            vid = vid.group(1)
+        info = self.ydl.extract_info("https://www.youtube.com/watch?v=" + vid, download=False)
         await ctx.send(f"Added {info['title']} to the queue.")
         try:
             self.queued[guild_id].append(info)
@@ -73,23 +78,24 @@ class Voice_Cogs(commands.Cog):
             self.queued[guild_id].extend(playlist_content.video_urls)
             self.loop[guild_id] = False
             await ctx.send(f"Playing {len(playlist_content.video_urls)} items.")
-            await self.player(ctx, voice_client)    
-    
+            await self.player(ctx, voice_client)
+
+    #! This is ugly and repeats entires for some reason
+    #! TODO: Write a better search function.
     async def search(self, ctx, query):
-        msg = await ctx.send("Getting Content...")
+        msg = await ctx.send("THIS SHIT IS BROKEN, PLEASE USE A LINK INSTEAD.")
         html = urllib.request.urlopen("https://www.youtube.com/results?search_query=" + query)
         res_iter = re.finditer(r"watch\?v=(\S{11})", html.read().decode())
         while(True):
             mcontent = ""
-            indexes = []
+            indexes = [  ]
             while len(indexes) < 5:
                 vid = next(res_iter, None)
                 if not vid:
                     res_iter = re.finditer(r"watch\?v=(\S{11})", html.read().decode())
                     vid = next(res_iter, None)
-                    
-                if not vid in indexes:
-                    indexes.append(vid)
+                if not vid.group(1) in indexes:
+                    indexes.append(vid.group(1))
                     info = self.ydl.extract_info("https://www.youtube.com/watch?v=" + vid.group(1), download=False)
                     mcontent += f"{len(indexes)}. {info['title']} / {info['uploader']} / {info['duration']}s \n"
             await msg.edit(content = mcontent)
@@ -99,8 +105,7 @@ class Voice_Cogs(commands.Cog):
                     check = lambda x: x.channel.id == ctx.channel.id
                     and x.author.id == ctx.author.id
                     and(
-                        x.content == ">" 
-                        or x.content == "<"
+                        x.content == ">"
                         or (int(x.content) > 0 and int(x.content) < 6)
                     ),
                     timeout = 60
@@ -113,18 +118,20 @@ class Voice_Cogs(commands.Cog):
             elif(res.content == "exit"):
                 await msg.edit(content = "Exiting...")
                 return None 
-            else:
+            else :
                 print(res.content)
+                print(indexes)
                 return indexes[int(res.content) - 1]
-             
+
     async def player(self, ctx, voice_client):
         guild_id = ctx.guild.id
-        if len(self.queued[guild_id]) == 0 or voice_client == None:
-            del(self.queued[guild_id])
-            del(self.loop[guild_id])
-            await voice_client.disconnect()
-            return
         while len(self.queued[guild_id]) > 0:
+            if len(voice_client.channel.members) == 1 and voice_client.is_connected():
+                self.queued[guild_id].clear()
+                del(self.queued[guild_id])
+                del(self.loop[guild_id])
+                await voice_client.disconnect()
+                return
             song = self.queued[guild_id][0]
             if type(song) == str:
                 song = self.ydl.extract_info(song, download=False)
@@ -135,6 +142,7 @@ class Voice_Cogs(commands.Cog):
                 try:
                     source = discord.FFmpegPCMAudio(
                         song['url'], 
+                        #! Should read these options from a config file
                         executable= "/usr/bin/ffmpeg",
                         before_options = "-loglevel debug"
                     )
@@ -147,20 +155,13 @@ class Voice_Cogs(commands.Cog):
                     with open("error.log", "w") as f:
                         f.write(str(e))
                     await ctx.send(f"Uhhhh bot machine broke....")
-                    return
-            if len(voice_client.channel.members) == 1 and voice_client.is_connected():
-                self.queued[guild_id].clear()
-                del(self.queued[guild_id])
-                del(self.loop[guild_id])
-                await voice_client.disconnect()
-                return
             if len(self.queued[guild_id]) > 0 and self.loop[guild_id] == False:
                 self.queued[guild_id].pop(0)
-            if len(self.queued[guild_id]) == 0:
-                del(self.queued[guild_id])
-                del(self.loop[guild_id])
-                await voice_client.disconnect()
-                return
+        self.queued[guild_id].clear()
+        del(self.queued[guild_id])
+        del(self.loop[guild_id])
+        await voice_client.disconnect()
+        return
 
     async def coro(self, ctx, duration):
         await asyncio.sleep(duration + 1)
@@ -185,8 +186,7 @@ class Voice_Cogs(commands.Cog):
         voice_client = discord.utils.get(self.bot.voice_clients, guild=ctx.guild)
         voice_client.stop()
         self.tasker.cancel()
-        if len(self.queued[guild_id]) > 0:
-            self.queued[guild_id].pop(0)
+        if len(self.queued[guild_id]) > 0: self.queued[guild_id].pop(0)
         await ctx.send("skipped song")
         await self.player(ctx, voice_client)
 
@@ -214,6 +214,7 @@ class Voice_Cogs(commands.Cog):
             return
         while i < 5 and i < len(self.queued[guild_id]):
             if type(self.queued[guild_id][i]) == str:
+                #! Need to create a dict that holds the pre-extracted info.
                 self.queued[guild_id][i] = self.ydl.extract_info(self.queued[guild_id][i], download=False)
             sometext += f"{i + 1}. {self.queued[guild_id][i]['title']}\n"
             i += 1

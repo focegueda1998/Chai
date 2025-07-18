@@ -6,6 +6,7 @@ from cogs import image_cogs, base_cogs, voice_cogs
 from dotenv import load_dotenv
 
 class Chai(commands.Bot):
+    #! Should make prefix readable from a config file
     def __init__(self, prefix = '$chai ', intents = discord.Intents.all(), cogs_list = []):
         intents.messages = True
         super().__init__(command_prefix = prefix, intents = intents)
@@ -22,6 +23,7 @@ class Chai(commands.Bot):
         await self.start(TOKEN)
 
 if __name__ == '__main__':
+    #! Should modify this to read from a seperate config file
     chai = Chai (
         cogs_list = [
             'cogs.image_cogs',
